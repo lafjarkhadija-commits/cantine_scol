@@ -6,7 +6,7 @@ return [
         'port' => '3306',
         'name' => 'cantine_scolaire',
         'user' => 'root',
-        'pass' => '', // rester vide dans le repo public
+        'pass' => 'khadija2004', // rester vide dans le repo public
         'charset' => 'utf8mb4',
     ],
 ];

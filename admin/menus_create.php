@@ -30,6 +30,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($calories < 0) $calories = 0;
 
         try {
+            // Vérifie explicitement s'il existe déjà un menu pour cette date + type
+            $dup = db()->prepare('SELECT 1 FROM menus WHERE date_menu = :d AND type_repas = :t LIMIT 1');
+            $dup->execute([':d' => $date, ':t' => $type]);
+            if ($dup->fetchColumn()) {
+                $error = "Un menu pour cette date et ce type de repas existe déjà. Utilisez la modification (ou changez la date/type).";
+                throw new Exception('Duplicate menu for date/type');
+            }
+
             // 2) INSERT + gestion erreur doublon UNIQUE(date_menu, type_repas)
             $stmt = db()->prepare(
                 'INSERT INTO menus (date_menu, type_repas, description, calories_total, allergenes)
