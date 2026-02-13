@@ -26,23 +26,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Login Élève</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Connexion eleve</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/cantine_scolaire/assets/css/app.css?v=1">
 </head>
 <body>
-<div class="container">
-    <h1>Connexion Élève</h1>
-    <a href="/cantine_scolaire/index.php">Retour</a>
-    <?php if ($error): ?>
-        <div class="alert"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-    <form method="post">
-        <label>Email</label>
-        <input type="email" name="email" required>
-        <label>Mot de passe</label>
-        <input type="password" name="mot_de_passe" required>
-        <button type="submit">Se connecter</button>
-    </form>
-</div>
+<main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div class="section-card" style="max-width:420px;width:100%;">
+        <h1 style="margin-top:0;">Connexion eleve</h1>
+        <p class="text-muted">Acces reserve aux eleves inscrits.</p>
+        <?php if ($error): ?>
+            <div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+        <form method="post" class="filter-grid">
+            <div>
+                <label>Email</label>
+                <input type="email" name="email" required>
+            </div>
+            <div>
+                <label>Mot de passe</label>
+                <input type="password" name="mot_de_passe" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Se connecter</button>
+                <a class="btn btn-ghost" href="/cantine_scolaire/index.php">Retour</a>
+            </div>
+        </form>
+    </div>
+</main>
 </body>
 </html>

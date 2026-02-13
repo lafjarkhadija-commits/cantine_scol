@@ -4,7 +4,6 @@ require_once __DIR__ . '/../lib/db.php';
 
 ensure_session();
 
-// Seul un admin connecté peut gérer les admins
 if (($_SESSION['role'] ?? '') !== 'admin') {
     header('Location: /cantine_scolaire/admin/login.php');
     exit;
@@ -63,60 +62,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+$pageTitle = 'Gestion admins';
+$pageSubtitle = 'Administration des comptes.';
+require __DIR__ . '/../partials/layout_start.php';
 ?>
-<!DOCTYPE html>
-<html lang="fr">
 
-<head>
-    <meta charset="UTF-8">
-    <title>Gestion Admins</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
-</head>
+<section class="section-card">
+    <h1>Gestion admins</h1>
+    <p class="text-muted">Mise a jour du profil et creation d'administrateurs.</p>
+</section>
 
-<body>
-    <div class="container">
-        <h2>Gestion admins</h2>
+<section class="section-card">
+    <h2>Profil admin courant</h2>
+    <?php if ($successProfile): ?>
+        <div class="success" style="margin-bottom:12px;"><?= htmlspecialchars($successProfile) ?></div>
+    <?php endif; ?>
+    <?php if ($errorProfile): ?>
+        <div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($errorProfile) ?></div>
+    <?php endif; ?>
 
-        <h3>Profil admin courant</h3>
-        <?php if ($successProfile): ?>
-            <div class="success"><?= htmlspecialchars($successProfile) ?></div>
-        <?php endif; ?>
-        <?php if ($errorProfile): ?>
-            <div class="alert"><?= htmlspecialchars($errorProfile) ?></div>
-        <?php endif; ?>
-
-        <form method="post">
-            <input type="hidden" name="action" value="profile">
+    <form method="post" class="filter-grid">
+        <input type="hidden" name="action" value="profile">
+        <div>
             <label>Email</label>
             <input type="email" name="email" value="<?= htmlspecialchars($currentAdmin['email'] ?? '') ?>" required>
-
+        </div>
+        <div>
             <label>Mot de passe (laisser vide pour ne pas changer)</label>
             <input type="password" name="mot_de_passe" placeholder="Nouveau mot de passe">
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Mettre a jour</button>
+        </div>
+    </form>
+</section>
 
-            <button type="submit">Mettre a jour</button>
-        </form>
+<section class="section-card">
+    <h2>Creer un nouvel admin</h2>
+    <?php if ($successCreate): ?>
+        <div class="success" style="margin-bottom:12px;"><?= htmlspecialchars($successCreate) ?></div>
+    <?php endif; ?>
+    <?php if ($errorCreate): ?>
+        <div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($errorCreate) ?></div>
+    <?php endif; ?>
 
-        <h3 style="margin-top:24px;">Creer un nouvel admin</h3>
-        <?php if ($successCreate): ?>
-            <div class="success"><?= htmlspecialchars($successCreate) ?></div>
-        <?php endif; ?>
-        <?php if ($errorCreate): ?>
-            <div class="alert"><?= htmlspecialchars($errorCreate) ?></div>
-        <?php endif; ?>
-
-        <form method="post">
-            <input type="hidden" name="action" value="create">
+    <form method="post" class="filter-grid">
+        <input type="hidden" name="action" value="create">
+        <div>
             <label>Email</label>
             <input type="email" name="email" required>
-
+        </div>
+        <div>
             <label>Mot de passe</label>
             <input type="password" name="mot_de_passe" required>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Creer</button>
+        </div>
+    </form>
+</section>
 
-            <button type="submit">Creer</button>
-        </form>
-
-        <p><a href="/cantine_scolaire/admin/dashboard.php">Retour au dashboard</a></p>
-    </div>
-</body>
-
-</html>
+<?php require __DIR__ . '/../partials/layout_end.php'; ?>

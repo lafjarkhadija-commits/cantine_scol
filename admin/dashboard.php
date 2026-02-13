@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../lib/auth.php';
 require_role('admin');
 
@@ -62,8 +62,10 @@ if (!empty($filterDate)) {
 $stmtPlanif->execute();
 $planifications = $stmtPlanif->fetchAll();
 $menusAVenir = count($planifications);
+
 // Chiffre d'affaires & popularite (views)
 $caJour = 0.0;
+$caTotal = 0.0;
 $topMenu = null;
 $flopMenu = null;
 $caMenus = [];
@@ -73,10 +75,24 @@ $caDate = trim($_GET['ca_date'] ?? '');
 if ($caDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $caDate)) {
     $caDate = '';
 }
-$loadCa = function () use (&$caJour, &$caMenus, &$caHasData, &$topMenu, &$flopMenu, $caDate) {
-    $caJourStmt = db()->prepare("SELECT chiffre_affaire FROM v_ca_total_par_jour WHERE date_menu = CURDATE()");
-    $caJourStmt->execute();
+$loadCa = function () use (&$caJour, &$caTotal, &$caMenus, &$caHasData, &$topMenu, &$flopMenu, $caDate) {
+    if ($caDate !== '') {
+        $caJourStmt = db()->prepare("SELECT chiffre_affaire FROM v_ca_total_par_jour WHERE date_menu = :ca_date");
+        $caJourStmt->execute([':ca_date' => $caDate]);
+    } else {
+        $caJourStmt = db()->prepare("SELECT chiffre_affaire FROM v_ca_total_par_jour WHERE date_menu = CURDATE()");
+        $caJourStmt->execute();
+    }
     $caJour = (float)($caJourStmt->fetchColumn() ?? 0);
+
+    if ($caDate !== '') {
+        $caTotalStmt = db()->prepare("SELECT COALESCE(SUM(chiffre_affaire), 0) FROM v_ca_total_par_jour WHERE date_menu = :ca_date");
+        $caTotalStmt->execute([':ca_date' => $caDate]);
+    } else {
+        $caTotalStmt = db()->prepare("SELECT COALESCE(SUM(chiffre_affaire), 0) FROM v_ca_total_par_jour");
+        $caTotalStmt->execute();
+    }
+    $caTotal = (float)($caTotalStmt->fetchColumn() ?? 0);
 
     $caSql = "
         SELECT date_menu, type_repas, description, quantite_totale, prix_unitaire, chiffre_affaire
@@ -103,8 +119,30 @@ $loadCa = function () use (&$caJour, &$caMenus, &$caHasData, &$topMenu, &$flopMe
     }
 
     if ($caHasData) {
-        $topMenu = db()->query("SELECT description, type_repas, quantite_totale FROM v_menus_top_flop ORDER BY quantite_totale DESC LIMIT 1")->fetch();
-        $flopMenu = db()->query("SELECT description, type_repas, quantite_totale FROM v_menus_top_flop ORDER BY quantite_totale ASC LIMIT 1")->fetch();
+        if ($caDate !== '') {
+            $topStmt = db()->prepare("
+                SELECT description, type_repas, quantite_totale, chiffre_affaire
+                FROM v_ca_menus_par_jour
+                WHERE date_menu = :ca_date
+                ORDER BY quantite_totale DESC
+                LIMIT 1
+            ");
+            $topStmt->execute([':ca_date' => $caDate]);
+            $topMenu = $topStmt->fetch();
+
+            $flopStmt = db()->prepare("
+                SELECT description, type_repas, quantite_totale, chiffre_affaire
+                FROM v_ca_menus_par_jour
+                WHERE date_menu = :ca_date
+                ORDER BY quantite_totale ASC
+                LIMIT 1
+            ");
+            $flopStmt->execute([':ca_date' => $caDate]);
+            $flopMenu = $flopStmt->fetch();
+        } else {
+            $topMenu = db()->query("SELECT description, type_repas, quantite_totale, chiffre_affaire FROM v_menus_top_flop ORDER BY quantite_totale DESC LIMIT 1")->fetch();
+            $flopMenu = db()->query("SELECT description, type_repas, quantite_totale, chiffre_affaire FROM v_menus_top_flop ORDER BY quantite_totale ASC LIMIT 1")->fetch();
+        }
     }
 };
 
@@ -121,6 +159,7 @@ try {
         $caError = "Erreur CA: " . $e2->getMessage();
     }
 }
+
 // Alertes allergenes (filtre sur la date si choisie)
 $sqlAlertes = "
   SELECT
@@ -160,113 +199,213 @@ $soldeRows = $soldeStmt->fetchAll();
 // Commandes confirmees (statique)
 $cmdCountStmt = db()->query("SELECT COUNT(*) AS total FROM commandes WHERE statut = 'CONFIRMEE'");
 $cmdConfirmed = (int)($cmdCountStmt->fetch()['total'] ?? 0);
+
+// Menus les plus demandes (CONFIRMEE/SERVIE)
+$menuTypes = ['Dejeuner', 'Gouter', 'Diner'];
+$menuTypeFilter = $_GET['menu_type'] ?? '';
+if (!in_array($menuTypeFilter, $menuTypes, true)) {
+    $menuTypeFilter = '';
+}
+$menusQteSql = "
+    SELECT
+        m.id_menu,
+        m.date_menu,
+        m.type_repas,
+        m.description,
+        COALESCE(SUM(c.quantite), 0) AS quantite_totale
+    FROM menus m
+    LEFT JOIN commandes c
+        ON c.id_menu = m.id_menu
+        AND c.statut IN ('CONFIRMEE', 'SERVIE')
+";
+$menusQteParams = [];
+if ($menuTypeFilter !== '') {
+    $menusQteSql .= " WHERE m.type_repas = :menu_type";
+    $menusQteParams[':menu_type'] = $menuTypeFilter;
+}
+$menusQteSql .= "
+    GROUP BY m.id_menu, m.date_menu, m.type_repas, m.description
+    ORDER BY quantite_totale DESC, m.date_menu DESC, m.id_menu DESC
+";
+$menusQteStmt = db()->prepare($menusQteSql);
+foreach ($menusQteParams as $key => $val) {
+    $menusQteStmt->bindValue($key, $val, PDO::PARAM_STR);
+}
+$menusQteStmt->execute();
+$menusParQte = $menusQteStmt->fetchAll();
+
+$pageTitle = 'Dashboard Admin';
+$pageSubtitle = 'Vision globale des menus, commandes et alertes.';
+require __DIR__ . '/../partials/layout_start.php';
 ?>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Dashboard Admin</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
-    <script defer src="/cantine_scolaire/public/app.js"></script>
-</head>
-<body>
-    <div class="container">
-        <nav>
-            <a class="btn" href="/cantine_scolaire/admin/menus_management.php">Gestion des menus</a>
-            <a class="btn" href="/cantine_scolaire/admin/eleve_management.php">Gestion des eleves</a>
-            <a class="btn" href="/cantine_scolaire/admin/commandes_management.php">Gestion des commandes</a>
-            <a class="btn" href="/cantine_scolaire/admin/paiements_create.php">Enregistrer un paiement</a>
-            <a class="btn" href="/cantine_scolaire/admin/create_admins.php">Gestion admins</a>
-            <a class="btn" href="/cantine_scolaire/logout.php">Deconnexion</a>
-        </nav>
 
-        <div class="hero" style="margin-bottom:16px;">
-            <h1>Dashboard Admin</h1>
-            <p class="text-muted">Vision globale des menus, commandes et alertes allergenes.</p>
+<section class="hero">
+    <h1>Dashboard Admin</h1>
+    <p>Suivi des menus, commandes, alertes et finances.</p>
+</section>
+
+<section class="card-grid">
+    <div class="stat-card">
+        <div class="stat-title"><span class="stat-icon">&#127869;</span> Menus a venir</div>
+        <div class="stat-value"><?= htmlspecialchars($menusAVenir) ?></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title"><span class="stat-icon">&#128203;</span> Commandes confirmees</div>
+        <div class="stat-value"><?= htmlspecialchars($cmdConfirmed) ?></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title"><span class="stat-icon">&#9888;</span> Alertes allergenes</div>
+        <div class="stat-value"><?= htmlspecialchars($alertesCount) ?></div>
+    </div>
+</section>
+
+<section class="section-card">
+    <h2>Chiffre d'affaires et popularite des menus</h2>
+    <?php if ($caError): ?>
+        <div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($caError) ?></div>
+    <?php elseif (!$caHasData): ?>
+        <div class="alert" style="margin-bottom:12px;">Aucune commande confirmee.</div>
+    <?php endif; ?>
+
+    <form method="get" class="filter-grid" style="margin-bottom:16px;">
+        <div>
+            <label>Filtrer CA par date</label>
+            <input type="date" name="ca_date" value="<?= htmlspecialchars($caDate) ?>">
         </div>
-
-        <div class="card-grid">
-            <div class="card">
-                <p class="text-muted">Menus Ã  venir</p>
-                <h2><?= htmlspecialchars($menusAVenir) ?></h2>
-            </div>
-            <div class="card">
-                <p class="text-muted">Commandes confirmÃ©es</p>
-                <h2><?= htmlspecialchars($cmdConfirmed) ?></h2>
-            </div>
-            <div class="card">
-                <p class="text-muted">Alertes allergenes</p>
-                <h2><?= htmlspecialchars($alertesCount) ?></h2>
-            </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+            <a class="btn btn-ghost" href="/cantine_scolaire/admin/dashboard.php">Reset</a>
         </div>
+    </form>
 
-<h2>Chiffre d'affaires & popularite des menus</h2>
-<?php if ($caError): ?>
-    <div class="alert"><?= htmlspecialchars($caError) ?></div>
-<?php elseif (!$caHasData): ?>
-    <div class="alert">Aucune commande confirmee.</div>
-<?php endif; ?>
-<form method="get" style="margin:8px 0 12px;">
-    <label>Filtrer CA par date</label>
-    <input type="date" name="ca_date" value="<?= htmlspecialchars($caDate) ?>">
-    <button type="submit">Filtrer</button>
-</form>
-<div class="card-grid">
-    <div class="card">
-        <p class="text-muted">CA du jour</p>
-        <h2><?= htmlspecialchars(number_format($caJour, 2)) ?> DH</h2>
-    </div>
-    <div class="card">
-        <p class="text-muted">Menu le plus commande</p>
-        <h2><?= htmlspecialchars($topMenu['description'] ?? '—') ?></h2>
-        <p class="text-muted"><?= htmlspecialchars($topMenu['type_repas'] ?? '—') ?> - <?= htmlspecialchars($topMenu['quantite_totale'] ?? 0) ?> commandes</p>
-    </div>
-    <div class="card">
-        <p class="text-muted">Menu le moins commande</p>
-        <h2><?= htmlspecialchars($flopMenu['description'] ?? '—') ?></h2>
-        <p class="text-muted"><?= htmlspecialchars($flopMenu['type_repas'] ?? '—') ?> - <?= htmlspecialchars($flopMenu['quantite_totale'] ?? 0) ?> commandes</p>
-    </div>
-</div>
-
-<label for="ca-search">Recherche (date / type / description)</label>
-<input id="ca-search" type="text" placeholder="Ex: 2026-01-10, Dejeuner, Poulet..." style="margin:8px 0;width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);">
-
-<table id="ca-table">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Quantite</th>
-            <th>Prix unitaire</th>
-            <th>Chiffre d'affaire</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php foreach ($caMenus as $row): ?>
-            <tr>
-                <td><?= htmlspecialchars($row['date_menu']) ?></td>
-                <td><?= htmlspecialchars($row['type_repas']) ?></td>
-                <td><?= htmlspecialchars($row['description']) ?></td>
-                <td><?= htmlspecialchars($row['quantite_totale']) ?></td>
-                <td><?= htmlspecialchars(number_format((float)$row['prix_unitaire'], 2)) ?></td>
-                <td><?= htmlspecialchars(number_format((float)$row['chiffre_affaire'], 2)) ?></td>
-            </tr>
-        <?php endforeach; ?>
-        <?php if (!$caMenus): ?>
-            <tr><td colspan="6">Aucune commande confirmee.</td></tr>
+    <div class="card-grid" style="margin-bottom:16px;">
+        <div class="stat-card">
+            <div class="stat-title"><span class="stat-icon">&#128200;</span> CA du jour</div>
+            <div class="stat-value"><?= htmlspecialchars(number_format($caJour, 2)) ?> DH</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title"><span class="stat-icon">&#128176;</span> CA accumule</div>
+            <div class="stat-value"><?= htmlspecialchars(number_format($caTotal, 2)) ?> DH</div>
+        </div>
+        <?php if ($caHasData): ?>
+            <div class="stat-card">
+                <div class="stat-title"><span class="stat-icon">&#127873;</span> Menu le plus commande</div>
+                <div class="stat-value"><?= htmlspecialchars($topMenu['description'] ?? '-') ?></div>
+                <div class="text-muted" style="font-size:13px;">
+                    <?= htmlspecialchars($topMenu['type_repas'] ?? '-') ?> - <?= htmlspecialchars($topMenu['quantite_totale'] ?? 0) ?> commandes
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title"><span class="stat-icon">&#128465;</span> Menu le moins commande</div>
+                <div class="stat-value"><?= htmlspecialchars($flopMenu['description'] ?? '-') ?></div>
+                <div class="text-muted" style="font-size:13px;">
+                    <?= htmlspecialchars($flopMenu['type_repas'] ?? '-') ?> - <?= htmlspecialchars($flopMenu['quantite_totale'] ?? 0) ?> commandes
+                </div>
+            </div>
         <?php endif; ?>
-    </tbody>
-</table>
+    </div>
 
-<form method="get"><form method="get">
+    <div style="margin-bottom:12px;">
+        <label for="ca-search">Recherche (date, type, description)</label>
+        <input id="ca-search" type="text" placeholder="Ex: 2026-01-10, Dejeuner, Poulet...">
+    </div>
+
+    <div class="table-wrap">
+        <table id="ca-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Quantite</th>
+                    <th>Prix unitaire</th>
+                    <th>Chiffre d'affaire</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($caMenus as $row): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($row['date_menu']) ?></td>
+                        <td><?= htmlspecialchars($row['type_repas']) ?></td>
+                        <td><?= htmlspecialchars($row['description']) ?></td>
+                        <td><?= htmlspecialchars($row['quantite_totale']) ?></td>
+                        <td><?= htmlspecialchars(number_format((float)$row['prix_unitaire'], 2)) ?></td>
+                        <td><?= htmlspecialchars(number_format((float)$row['chiffre_affaire'], 2)) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (!$caMenus): ?>
+                    <tr><td colspan="6">Aucune commande confirmee.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="section-card">
+    <h2>Menus les plus demandes</h2>
+    <p class="text-muted">Classement par quantite commandee, du plus demande au moins demande.</p>
+    <form method="get" class="filter-grid" style="margin-bottom:12px;">
+        <div>
+            <label>Filtrer par type</label>
+            <select name="menu_type">
+                <option value="">Tous</option>
+                <?php foreach ($menuTypes as $mt): ?>
+                    <option value="<?= $mt ?>" <?= $menuTypeFilter === $mt ? 'selected' : '' ?>><?= $mt ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+            <a class="btn btn-ghost" href="/cantine_scolaire/admin/dashboard.php">Reset</a>
+        </div>
+    </form>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Quantite</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($menusParQte as $menu): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($menu['id_menu']) ?></td>
+                        <td><?= htmlspecialchars($menu['date_menu']) ?></td>
+                        <td><?= htmlspecialchars($menu['type_repas']) ?></td>
+                        <td><?= htmlspecialchars($menu['description']) ?></td>
+                        <td><?= htmlspecialchars($menu['quantite_totale']) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (!$menusParQte): ?>
+                    <tr><td colspan="5">Aucun menu trouve.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="section-card">
+    <h2>Planification des repas</h2>
+    <form method="get" class="filter-grid" style="margin-bottom:12px;">
+        <div>
             <label>Filtrer par date</label>
             <input type="date" name="date" value="<?= htmlspecialchars($filterDate) ?>">
-            <button type="submit">Filtrer</button>
-        </form>
-        <input id="filter-global" type="text" placeholder="Rechercher dans les tableaux..." style="margin:12px 0;width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);">
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+            <a class="btn btn-ghost" href="/cantine_scolaire/admin/dashboard.php">Reset</a>
+        </div>
+        <div>
+            <label>Recherche globale</label>
+            <input id="filter-global" type="text" placeholder="Rechercher dans les tableaux...">
+        </div>
+    </form>
 
-        <h2>Planification des repas</h2>
+    <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -291,8 +430,12 @@ $cmdConfirmed = (int)($cmdCountStmt->fetch()['total'] ?? 0);
                 <?php endforeach; ?>
             </tbody>
         </table>
+    </div>
+</section>
 
-        <h2>Alertes allergenes</h2>
+<section class="section-card">
+    <h2>Alertes allergenes</h2>
+    <div class="table-wrap">
         <table>
             <thead>
                 <tr>
@@ -315,30 +458,37 @@ $cmdConfirmed = (int)($cmdCountStmt->fetch()['total'] ?? 0);
                 <?php endforeach; ?>
             </tbody>
         </table>
+    </div>
+</section>
 
-        <h2>Soldes financiers</h2>
+<section class="section-card">
+    <h2>Soldes financiers</h2>
+    <div class="table-wrap">
         <table>
-            <tr>
-                <th>Eleve</th>
-                <th>Classe</th>
-                <th>Solde</th>
-            </tr>
-            <?php foreach ($soldeRows as $row): ?>
+            <thead>
                 <tr>
-                    <td><?= htmlspecialchars($row['nom'] ?? '') ?> <?= htmlspecialchars($row['prenom'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($row['classe'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($row['solde'] ?? '') ?></td>
+                    <th>Eleve</th>
+                    <th>Classe</th>
+                    <th>Solde</th>
                 </tr>
-            <?php endforeach; ?>
-            <?php if (!$soldeRows): ?>
-                <tr>
-                    <td colspan="3">Aucun solde trouve.</td>
-                </tr>
-            <?php endif; ?>
+            </thead>
+            <tbody>
+                <?php foreach ($soldeRows as $row): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($row['nom'] ?? '') ?> <?= htmlspecialchars($row['prenom'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($row['classe'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($row['solde'] ?? '') ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (!$soldeRows): ?>
+                    <tr>
+                        <td colspan="3">Aucun solde trouve.</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
         </table>
     </div>
-</body>
-</html>
+</section>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -353,7 +503,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Filtre startsWith pour le tableau CA (date/type/description)
     const caSearch = document.getElementById('ca-search');
     const caTable = document.getElementById('ca-table');
     if (caSearch && caTable) {
@@ -369,40 +518,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-
-    // Tri simple sur clic d'entÃªte
-    document.querySelectorAll('table').forEach(table => {
-        const headers = table.querySelectorAll('th');
-        headers.forEach((th, idx) => {
-            th.style.cursor = 'pointer';
-            th.addEventListener('click', () => {
-                const tbody = table.querySelector('tbody');
-                if (!tbody) return;
-                const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.children.length);
-                const ascending = th.dataset.sortDir === 'asc' ? false : true;
-                rows.sort((a, b) => {
-                    const ta = (a.children[idx]?.innerText || '').trim().toLowerCase();
-                    const tb = (b.children[idx]?.innerText || '').trim().toLowerCase();
-                    // essai de tri numÃ©rique si applicable
-                    const na = parseFloat(ta.replace(',', '.'));
-                    const nb = parseFloat(tb.replace(',', '.'));
-                    if (!isNaN(na) && !isNaN(nb)) {
-                        return ascending ? na - nb : nb - na;
-                    }
-                    return ascending ? ta.localeCompare(tb) : tb.localeCompare(ta);
-                });
-                tbody.innerHTML = '';
-                rows.forEach(r => tbody.appendChild(r));
-                headers.forEach(h => delete h.dataset.sortDir);
-                th.dataset.sortDir = ascending ? 'asc' : 'desc';
-            });
-        });
-    });
 });
 </script>
 
-
-
-
+<?php require __DIR__ . '/../partials/layout_end.php'; ?>
 
 

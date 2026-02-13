@@ -22,10 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmt->execute([$email, $hash]);
 
-            $success = "Admin créé avec succès. Supprimez ce fichier après usage.";
+            $success = "Admin crÃ©Ã© avec succÃ¨s. Supprimez ce fichier aprÃ¨s usage.";
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
-                $error = "Cet email admin existe déjà.";
+                $error = "Cet email admin existe dÃ©jÃ .";
             } else {
                 $error = "Erreur : " . $e->getMessage();
             }
@@ -37,16 +37,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Création Admin (Setup)</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
+    <title>CrÃ©ation Admin (Setup)</title>
+    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css?v=3">
 </head>
 <body>
 <div class="container">
-    <h1>Création du premier administrateur</h1>
+    <h1>CrÃ©ation du premier administrateur</h1>
 
     <div class="alert">
         Page de configuration temporaire.  
-        À supprimer après la création du premier admin.
+        Ã€ supprimer aprÃ¨s la crÃ©ation du premier admin.
     </div>
 
     <?php if ($success): ?>
@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label>Mot de passe</label>
         <input type="password" name="mot_de_passe" required>
 
-        <button type="submit">Créer l’admin</button>
+        <button type="submit">CrÃ©er lâ€™admin</button>
     </form>
 
     <p><a href="/cantine_scolaire/index.php">Retour</a></p>

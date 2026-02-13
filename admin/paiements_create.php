@@ -55,18 +55,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!$idEleve) {
         $error = "Eleve introuvable.";
     } elseif (!is_numeric($montant) || (float)$montant <= 0) {
-        $error = "Montant invalide (doit être > 0).";
+        $error = "Montant invalide (doit etre > 0).";
     } elseif (!in_array($mode, $modes, true)) {
         $error = "Mode de paiement invalide.";
     } else {
-        // Verifier existence eleve
         $stmt = db()->prepare('SELECT id_eleve FROM eleves WHERE id_eleve = ?');
         $stmt->execute([$idEleve]);
         $eleveExists = $stmt->fetch();
         if (!$eleveExists) {
             $error = "Eleve introuvable.";
         } else {
-            // Finance avant
             $before = fetchFinance($idEleve);
             $beforeSolde = $before['solde'];
             $beforeTotalPaye = $before['total_paye'];
@@ -79,9 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':m' => $montant,
                     ':mode' => $mode,
                 ]);
-                $success = "Paiement enregistré avec succès";
+                $success = "Paiement enregistre avec succes.";
 
-                // Finance apres
                 $after = fetchFinance($idEleve);
                 $afterSolde = $after['solde'];
                 $afterTotalPaye = $after['total_paye'];
@@ -92,60 +89,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-?>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Enregistrer un paiement</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
-</head>
-<body>
-<div class="container">
-    <nav>
-        <a class="btn" href="/cantine_scolaire/admin/dashboard.php">Retour dashboard</a>
-        <a class="btn" href="/cantine_scolaire/logout.php">Deconnexion</a>
-    </nav>
-    <h1>Enregistrer un paiement</h1>
-    <?php if ($success): ?><div class="success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
-    <?php if ($error): ?><div class="alert"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-    <form method="post">
+$pageTitle = 'Paiements';
+$pageSubtitle = 'Enregistrer un paiement eleve.';
+require __DIR__ . '/../partials/layout_start.php';
+?>
+
+<section class="section-card">
+    <h1>Enregistrer un paiement</h1>
+    <?php if ($success): ?><div class="success" style="margin-bottom:12px;"><?= htmlspecialchars($success) ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+
+    <form method="post" class="filter-grid">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
 
-        <label>Elève</label>
-        <select name="id_eleve" required>
-            <option value="">-- Choisir un élève --</option>
-            <?php foreach ($eleves as $eleve): ?>
-                <option value="<?= $eleve['id_eleve'] ?>" <?= (isset($idEleve) && (int)$idEleve === (int)$eleve['id_eleve']) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($eleve['nom'] . ' ' . $eleve['prenom'] . ' (' . $eleve['classe'] . ') — ' . $eleve['email']) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
+        <div>
+            <label>Eleve</label>
+            <select name="id_eleve" required>
+                <option value="">-- Choisir un eleve --</option>
+                <?php foreach ($eleves as $eleve): ?>
+                    <option value="<?= $eleve['id_eleve'] ?>" <?= (isset($idEleve) && (int)$idEleve === (int)$eleve['id_eleve']) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($eleve['nom'] . ' ' . $eleve['prenom'] . ' (' . $eleve['classe'] . ') - ' . $eleve['email']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
 
-        <label>Montant</label>
-        <input type="number" name="montant" min="0.01" step="0.01" value="<?= htmlspecialchars($_POST['montant'] ?? '') ?>" required>
+        <div>
+            <label>Montant</label>
+            <input type="number" name="montant" min="0.01" step="0.01" value="<?= htmlspecialchars($_POST['montant'] ?? '') ?>" required>
+        </div>
 
-        <label>Mode de paiement</label>
-        <select name="mode_paiement" required>
-            <option value="">-- Choisir --</option>
-            <?php foreach ($modes as $m): ?>
-                <option value="<?= $m ?>" <?= (($_POST['mode_paiement'] ?? '') === $m) ? 'selected' : '' ?>><?= $m ?></option>
-            <?php endforeach; ?>
-        </select>
+        <div>
+            <label>Mode de paiement</label>
+            <select name="mode_paiement" required>
+                <option value="">-- Choisir --</option>
+                <?php foreach ($modes as $m): ?>
+                    <option value="<?= $m ?>" <?= (($_POST['mode_paiement'] ?? '') === $m) ? 'selected' : '' ?>><?= $m ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
 
-        <button type="submit">Enregistrer</button>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+            <a class="btn btn-ghost" href="/cantine_scolaire/admin/dashboard.php">Retour</a>
+        </div>
     </form>
+</section>
 
-    <?php if ($beforeSolde !== null): ?>
-        <h2>Résumé financier</h2>
+<?php if ($beforeSolde !== null): ?>
+<section class="section-card">
+    <h2>Resume financier</h2>
+    <div class="table-wrap">
         <table>
-            <tr><th></th><th>Avant paiement</th><th>Après paiement</th></tr>
-            <tr><td>Total à payer</td><td><?= htmlspecialchars($beforeTotalAPayer) ?></td><td><?= htmlspecialchars($afterTotalAPayer) ?></td></tr>
-            <tr><td>Total payé</td><td><?= htmlspecialchars($beforeTotalPaye) ?></td><td><?= htmlspecialchars($afterTotalPaye) ?></td></tr>
-            <tr><td>Solde</td><td><?= htmlspecialchars($beforeSolde) ?></td><td><?= htmlspecialchars($afterSolde) ?></td></tr>
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Avant paiement</th>
+                    <th>Apres paiement</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Total a payer</td><td><?= htmlspecialchars($beforeTotalAPayer) ?></td><td><?= htmlspecialchars($afterTotalAPayer) ?></td></tr>
+                <tr><td>Total paye</td><td><?= htmlspecialchars($beforeTotalPaye) ?></td><td><?= htmlspecialchars($afterTotalPaye) ?></td></tr>
+                <tr><td>Solde</td><td><?= htmlspecialchars($beforeSolde) ?></td><td><?= htmlspecialchars($afterSolde) ?></td></tr>
+            </tbody>
         </table>
-    <?php endif; ?>
-</div>
-</body>
-</html>
+    </div>
+</section>
+<?php endif; ?>
+
+<?php require __DIR__ . '/../partials/layout_end.php'; ?>

@@ -33,45 +33,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Veuillez remplir tous les champs obligatoires.";
     }
 }
+
+$pageTitle = 'Creer un eleve';
+$pageSubtitle = 'Ajout d\'eleves dans la base.';
+require __DIR__ . '/../partials/layout_start.php';
 ?>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Creer un eleve</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
-</head>
-<body>
-<div class="container">
-    <nav>
-        <a class="btn" href="/cantine_scolaire/admin/dashboard.php">Retour dashboard</a>
-        <a class="btn" href="/cantine_scolaire/logout.php">Deconnexion</a>
-    </nav>
+
+<section class="section-card">
     <h1>Creer un eleve</h1>
-    <?php if ($success): ?><div class="success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
-    <?php if ($error): ?><div class="alert"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+    <?php if ($success): ?><div class="success" style="margin-bottom:12px;"><?= htmlspecialchars($success) ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-    <form method="post">
-        <label>Nom</label>
-        <input type="text" name="nom" required>
-
-        <label>Prenom</label>
-        <input type="text" name="prenom" required>
-
-        <label>Classe</label>
-        <input type="text" name="classe" required>
-
-        <label>Allergies (optionnel)</label>
-        <input type="text" name="allergies">
-
-        <label>Email</label>
-        <input type="email" name="email" required>
-
-        <label>Mot de passe</label>
-        <input type="password" name="mot_de_passe" required>
-
-        <button type="submit">Creer l'eleve</button>
+    <form method="post" class="filter-grid">
+        <div>
+            <label>Nom</label>
+            <input type="text" name="nom" required>
+        </div>
+        <div>
+            <label>Prenom</label>
+            <input type="text" name="prenom" required>
+        </div>
+        <div>
+            <label>Classe</label>
+            <input type="text" name="classe" required>
+        </div>
+        <div>
+            <label>Allergies (optionnel)</label>
+            <input type="text" name="allergies">
+        </div>
+        <div>
+            <label>Email</label>
+            <input type="email" name="email" required>
+        </div>
+        <div>
+            <label>Mot de passe</label>
+            <input type="password" name="mot_de_passe" required>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Creer l'eleve</button>
+            <a class="btn btn-ghost" href="/cantine_scolaire/admin/eleve_management.php">Retour</a>
+        </div>
     </form>
-</div>
-</body>
-</html>
+</section>
+
+<?php require __DIR__ . '/../partials/layout_end.php'; ?>

@@ -12,7 +12,6 @@ $idMenu = (int)($_GET['id_menu'] ?? 0);
 $error = null;
 $success = null;
 
-// Charger le menu cible
 if ($idMenu > 0) {
     $stmt = db()->prepare('SELECT * FROM menus WHERE id_menu = ?');
     $stmt->execute([$idMenu]);
@@ -27,7 +26,6 @@ if ($idMenu > 0) {
 
 $typeOptions = ['Dejeuner', 'Gouter', 'Diner'];
 
-// Traitement mise a jour
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     $token = $_POST['csrf_token'] ?? '';
     if ($token !== $csrfToken) {
@@ -45,81 +43,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $error = "Type de repas invalide.";
         } else {
             try {
-                $stmt = db()->prepare('
-                    UPDATE menus
-                    SET date_menu = :d, type_repas = :t, description = :desc, calories_total = :c, allergenes = :a
-                    WHERE id_menu = :id
+                $dup = db()->prepare('
+                    SELECT 1 FROM menus
+                    WHERE date_menu = :d AND type_repas = :t AND id_menu <> :id
+                    LIMIT 1
                 ');
-                $stmt->execute([
-                    ':d' => $dateMenu,
-                    ':t' => $typeRepas,
-                    ':desc' => $description,
-                    ':c' => $calories !== '' ? $calories : null,
-                    ':a' => $allergenes,
-                    ':id' => $idMenu,
-                ]);
-                $success = "Menu mis a jour.";
-                // Rafraichir les valeurs affichees
-                $menu = [
-                    'id_menu' => $idMenu,
-                    'date_menu' => $dateMenu,
-                    'type_repas' => $typeRepas,
-                    'description' => $description,
-                    'calories_total' => $calories,
-                    'allergenes' => $allergenes,
-                ];
+                $dup->execute([':d' => $dateMenu, ':t' => $typeRepas, ':id' => $idMenu]);
+                if ($dup->fetchColumn()) {
+                    $error = "Un menu pour cette date et ce type de repas existe deja. Modifiez la date/type ou revenez au menu existant.";
+                } else {
+                    $stmt = db()->prepare('
+                        UPDATE menus
+                        SET date_menu = :d, type_repas = :t, description = :desc, calories_total = :c, allergenes = :a
+                        WHERE id_menu = :id
+                    ');
+                    $stmt->execute([
+                        ':d' => $dateMenu,
+                        ':t' => $typeRepas,
+                        ':desc' => $description,
+                        ':c' => $calories !== '' ? $calories : null,
+                        ':a' => $allergenes,
+                        ':id' => $idMenu,
+                    ]);
+                    $success = "Menu mis a jour.";
+                    $menu = [
+                        'id_menu' => $idMenu,
+                        'date_menu' => $dateMenu,
+                        'type_repas' => $typeRepas,
+                        'description' => $description,
+                        'calories_total' => $calories,
+                        'allergenes' => $allergenes,
+                    ];
+                }
             } catch (PDOException $e) {
-                $error = "Erreur lors de la mise a jour : " . $e->getMessage();
+                if ($e->getCode() === '23000') {
+                    $error = "Un menu pour cette date et ce type de repas existe deja. Modifiez la date/type ou revenez au menu existant.";
+                } else {
+                    $error = "Erreur lors de la mise a jour : " . $e->getMessage();
+                }
             }
         }
     }
 }
-?>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Modifier un menu</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
-</head>
-<body>
-<div class="container">
-    <nav>
-        <a class="btn" href="/cantine_scolaire/admin/menus_management.php">Retour gestion menus</a>
-        <a class="btn" href="/cantine_scolaire/admin/dashboard.php">Dashboard</a>
-        <a class="btn" href="/cantine_scolaire/logout.php">Deconnexion</a>
-    </nav>
 
+$pageTitle = 'Modifier un menu';
+$pageSubtitle = 'Mise a jour des informations menu.';
+require __DIR__ . '/../partials/layout_start.php';
+?>
+
+<section class="section-card">
     <h1>Modifier un menu</h1>
-    <?php if ($success): ?><div class="success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
-    <?php if ($error): ?><div class="alert"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+    <?php if ($success): ?><div class="success" style="margin-bottom:12px;"><?= htmlspecialchars($success) ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
     <?php if ($menu): ?>
-        <form method="post">
+        <form method="post" class="filter-grid">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
 
-            <label>Date du menu</label>
-            <input type="date" name="date_menu" value="<?= htmlspecialchars($menu['date_menu']) ?>" required>
-
-            <label>Type de repas</label>
-            <select name="type_repas" required>
-                <?php foreach ($typeOptions as $opt): ?>
-                    <option value="<?= $opt ?>" <?= ($menu['type_repas'] ?? '') === $opt ? 'selected' : '' ?>><?= $opt ?></option>
-                <?php endforeach; ?>
-            </select>
-
-            <label>Description</label>
-            <textarea name="description" rows="3" required><?= htmlspecialchars($menu['description'] ?? '') ?></textarea>
-
-            <label>Calories total</label>
-            <input type="number" name="calories_total" min="0" step="1" value="<?= htmlspecialchars($menu['calories_total'] ?? '') ?>">
-
-            <label>Allergenes</label>
-            <input type="text" name="allergenes" value="<?= htmlspecialchars($menu['allergenes'] ?? '') ?>">
-
-            <button type="submit">Enregistrer les modifications</button>
+            <div>
+                <label>Date du menu</label>
+                <input type="date" name="date_menu" value="<?= htmlspecialchars($menu['date_menu']) ?>" required>
+            </div>
+            <div>
+                <label>Type de repas</label>
+                <select name="type_repas" required>
+                    <?php foreach ($typeOptions as $opt): ?>
+                        <option value="<?= $opt ?>" <?= ($menu['type_repas'] ?? '') === $opt ? 'selected' : '' ?>><?= $opt ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label>Description</label>
+                <textarea name="description" rows="3" required><?= htmlspecialchars($menu['description'] ?? '') ?></textarea>
+            </div>
+            <div>
+                <label>Calories total</label>
+                <input type="number" name="calories_total" min="0" step="1" value="<?= htmlspecialchars($menu['calories_total'] ?? '') ?>">
+            </div>
+            <div>
+                <label>Allergenes</label>
+                <input type="text" name="allergenes" value="<?= htmlspecialchars($menu['allergenes'] ?? '') ?>">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+                <a class="btn btn-ghost" href="/cantine_scolaire/admin/menus_management.php">Retour</a>
+            </div>
         </form>
     <?php endif; ?>
-</div>
-</body>
-</html>
+</section>
+
+<?php require __DIR__ . '/../partials/layout_end.php'; ?>

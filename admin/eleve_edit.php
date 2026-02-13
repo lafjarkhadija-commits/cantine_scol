@@ -14,7 +14,6 @@ $success = null;
 
 $allowedClasses = ['GI', 'IID', 'GE', 'IRIC', 'GP'];
 
-// Charger l'eleve
 if ($idEleve > 0) {
     $stmt = db()->prepare('SELECT * FROM eleves WHERE id_eleve = ?');
     $stmt->execute([$idEleve]);
@@ -77,7 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                     ]);
                 }
                 $success = "Eleve mis a jour.";
-                // rafraichir
                 $eleve = [
                     'id_eleve' => $idEleve,
                     'nom' => $nom,
@@ -92,55 +90,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         }
     }
 }
-?>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Modifier un eleve</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
-</head>
-<body>
-<div class="container">
-    <nav>
-        <a class="btn" href="/cantine_scolaire/admin/eleve_management.php">Retour gestion eleves</a>
-        <a class="btn" href="/cantine_scolaire/admin/dashboard.php">Dashboard</a>
-        <a class="btn" href="/cantine_scolaire/logout.php">Deconnexion</a>
-    </nav>
 
+$pageTitle = 'Modifier un eleve';
+$pageSubtitle = 'Mise a jour des informations eleve.';
+require __DIR__ . '/../partials/layout_start.php';
+?>
+
+<section class="section-card">
     <h1>Modifier un eleve</h1>
-    <?php if ($success): ?><div class="success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
-    <?php if ($error): ?><div class="alert"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+    <?php if ($success): ?><div class="success" style="margin-bottom:12px;"><?= htmlspecialchars($success) ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
     <?php if ($eleve): ?>
-        <form method="post">
+        <form method="post" class="filter-grid">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
 
-            <label>Nom</label>
-            <input type="text" name="nom" value="<?= htmlspecialchars($eleve['nom'] ?? '') ?>" required>
-
-            <label>Prenom</label>
-            <input type="text" name="prenom" value="<?= htmlspecialchars($eleve['prenom'] ?? '') ?>" required>
-
-            <label>Classe</label>
-            <select name="classe" required>
-                <?php foreach ($allowedClasses as $c): ?>
-                    <option value="<?= $c ?>" <?= ($eleve['classe'] ?? '') === $c ? 'selected' : '' ?>><?= $c ?></option>
-                <?php endforeach; ?>
-            </select>
-
-            <label>Allergies</label>
-            <input type="text" name="allergies" value="<?= htmlspecialchars($eleve['allergies'] ?? '') ?>">
-
-            <label>Email</label>
-            <input type="email" name="email" value="<?= htmlspecialchars($eleve['email'] ?? '') ?>" required>
-
-            <label>Nouveau mot de passe (laisser vide pour conserver)</label>
-            <input type="password" name="mot_de_passe">
-
-            <button type="submit">Enregistrer les modifications</button>
+            <div>
+                <label>Nom</label>
+                <input type="text" name="nom" value="<?= htmlspecialchars($eleve['nom'] ?? '') ?>" required>
+            </div>
+            <div>
+                <label>Prenom</label>
+                <input type="text" name="prenom" value="<?= htmlspecialchars($eleve['prenom'] ?? '') ?>" required>
+            </div>
+            <div>
+                <label>Classe</label>
+                <select name="classe" required>
+                    <?php foreach ($allowedClasses as $c): ?>
+                        <option value="<?= $c ?>" <?= ($eleve['classe'] ?? '') === $c ? 'selected' : '' ?>><?= $c ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label>Allergies</label>
+                <input type="text" name="allergies" value="<?= htmlspecialchars($eleve['allergies'] ?? '') ?>">
+            </div>
+            <div>
+                <label>Email</label>
+                <input type="email" name="email" value="<?= htmlspecialchars($eleve['email'] ?? '') ?>" required>
+            </div>
+            <div>
+                <label>Nouveau mot de passe (laisser vide pour conserver)</label>
+                <input type="password" name="mot_de_passe">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                <a class="btn btn-ghost" href="/cantine_scolaire/admin/eleve_management.php">Retour</a>
+            </div>
         </form>
     <?php endif; ?>
-</div>
-</body>
-</html>
+</section>
+
+<?php require __DIR__ . '/../partials/layout_end.php'; ?>

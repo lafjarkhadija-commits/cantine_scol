@@ -79,98 +79,103 @@ $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $eleves = $stmt->fetchAll();
 
-// Calculer si une page suivante existe (simple check)
 $hasNext = count($eleves) === $perPage;
+
+$pageTitle = 'Gestion des eleves';
+$pageSubtitle = 'Recherche, filtres et actions securisees.';
+require __DIR__ . '/../partials/layout_start.php';
 ?>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Gestion des eleves</title>
-    <link rel="stylesheet" href="/cantine_scolaire/public/styles.css">
-    <script>
-        function confirmDelete(form) {
-            if (confirm('Supprimer cet eleve ?')) {
-                form.submit();
-            }
-            return false;
-        }
-    </script>
-</head>
-<body>
-<div class="container">
-    <nav>
-        <a class="btn" href="/cantine_scolaire/admin/dashboard.php">Retour dashboard</a>
-        <a class="btn" href="/cantine_scolaire/admin/create_eleves.php">Creer un eleve</a>
-        <a class="btn" href="/cantine_scolaire/logout.php">Deconnexion</a>
-    </nav>
 
+<section class="section-card">
     <h1>Gestion des eleves</h1>
-    <p class="text-muted">Recherche texte (nom, prenom, allergies), filtre par classe et tri controle.</p>
+    <p class="text-muted">Recherche par nom, prenom, allergies et filtre par classe.</p>
 
-    <?php if ($success): ?><div class="success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
-    <?php if ($error): ?><div class="alert"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+    <?php if ($success): ?><div class="success" style="margin-bottom:12px;"><?= htmlspecialchars($success) ?></div><?php endif; ?>
+    <?php if ($error): ?><div class="alert" style="margin-bottom:12px;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-    <form method="get">
-        <label>Recherche</label>
-        <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Nom, prenom ou allergies">
-
-        <label>Classe</label>
-        <select name="classe">
-            <option value="">Toutes</option>
-            <?php foreach ($allowedClasses as $c): ?>
-                <option value="<?= $c ?>" <?= $classe === $c ? 'selected' : '' ?>><?= $c ?></option>
-            <?php endforeach; ?>
-        </select>
-
-        <label>Tri</label>
-        <select name="order">
-            <option value="nom_asc" <?= $order === 'nom_asc' ? 'selected' : '' ?>>Nom (A-Z)</option>
-            <option value="nom_desc" <?= $order === 'nom_desc' ? 'selected' : '' ?>>Nom (Z-A)</option>
-            <option value="prenom_asc" <?= $order === 'prenom_asc' ? 'selected' : '' ?>>Prenom (A-Z)</option>
-            <option value="prenom_desc" <?= $order === 'prenom_desc' ? 'selected' : '' ?>>Prenom (Z-A)</option>
-        </select>
-
-        <button type="submit">Filtrer</button>
+    <form method="get" class="filter-grid">
+        <div>
+            <label>Recherche</label>
+            <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="Nom, prenom ou allergies">
+        </div>
+        <div>
+            <label>Classe</label>
+            <select name="classe">
+                <option value="">Toutes</option>
+                <?php foreach ($allowedClasses as $c): ?>
+                    <option value="<?= $c ?>" <?= $classe === $c ? 'selected' : '' ?>><?= $c ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label>Tri</label>
+            <select name="order">
+                <option value="nom_asc" <?= $order === 'nom_asc' ? 'selected' : '' ?>>Nom (A-Z)</option>
+                <option value="nom_desc" <?= $order === 'nom_desc' ? 'selected' : '' ?>>Nom (Z-A)</option>
+                <option value="prenom_asc" <?= $order === 'prenom_asc' ? 'selected' : '' ?>>Prenom (A-Z)</option>
+                <option value="prenom_desc" <?= $order === 'prenom_desc' ? 'selected' : '' ?>>Prenom (Z-A)</option>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+            <a class="btn btn-ghost" href="/cantine_scolaire/admin/eleve_management.php">Reset</a>
+            <a class="btn btn-secondary" href="/cantine_scolaire/admin/create_eleves.php">Creer un eleve</a>
+        </div>
     </form>
+</section>
 
+<section class="section-card">
     <h2>Resultats</h2>
-    <table>
-        <tr>
-            <th>id_eleve</th><th>Nom</th><th>Prenom</th><th>Classe</th><th>Allergies</th><th>Email</th><th>Actions</th>
-        </tr>
-        <?php foreach ($eleves as $eleve): ?>
-            <tr>
-                <td><?= htmlspecialchars($eleve['id_eleve']) ?></td>
-                <td><?= htmlspecialchars($eleve['nom']) ?></td>
-                <td><?= htmlspecialchars($eleve['prenom']) ?></td>
-                <td><?= htmlspecialchars($eleve['classe']) ?></td>
-                <td><?= htmlspecialchars($eleve['allergies']) ?></td>
-                <td><?= htmlspecialchars($eleve['email']) ?></td>
-                <td>
-                    <a class="btn" href="/cantine_scolaire/admin/eleve_edit.php?id_eleve=<?= urlencode($eleve['id_eleve']) ?>" style="background:#0ea5e9;">Modifier</a>
-                    <form method="post" onsubmit="return confirmDelete(this);" style="display:inline;">
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="id_eleve" value="<?= htmlspecialchars($eleve['id_eleve']) ?>">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                        <button type="submit" class="btn" style="background:#e11d48;">Supprimer</button>
-                    </form>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-        <?php if (!$eleves): ?>
-            <tr><td colspan="7">Aucun eleve trouve.</td></tr>
-        <?php endif; ?>
-    </table>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nom</th>
+                    <th>Prenom</th>
+                    <th>Classe</th>
+                    <th>Allergies</th>
+                    <th>Email</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($eleves as $eleve): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($eleve['id_eleve']) ?></td>
+                        <td><?= htmlspecialchars($eleve['nom']) ?></td>
+                        <td><?= htmlspecialchars($eleve['prenom']) ?></td>
+                        <td><?= htmlspecialchars($eleve['classe']) ?></td>
+                        <td><?= htmlspecialchars($eleve['allergies']) ?></td>
+                        <td><?= htmlspecialchars($eleve['email']) ?></td>
+                        <td>
+                            <div class="inline-actions">
+                                <a class="btn btn-ghost" href="/cantine_scolaire/admin/eleve_edit.php?id_eleve=<?= urlencode($eleve['id_eleve']) ?>">Modifier</a>
+                                <form method="post" data-confirm="Supprimer cet eleve ?" style="display:inline;">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="id_eleve" value="<?= htmlspecialchars($eleve['id_eleve']) ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                    <button type="submit" class="btn btn-danger">Supprimer</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (!$eleves): ?>
+                    <tr><td colspan="7">Aucun eleve trouve.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 
-    <div style="margin-top:12px; display:flex; gap:8px;">
+    <div class="form-actions" style="margin-top:12px;">
         <?php if ($page > 1): ?>
-            <a class="btn" href="?<?= http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>">Page precedente</a>
+            <a class="btn btn-ghost" href="?<?= http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>">Page precedente</a>
         <?php endif; ?>
         <?php if ($hasNext): ?>
-            <a class="btn" href="?<?= http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>">Page suivante</a>
+            <a class="btn btn-ghost" href="?<?= http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>">Page suivante</a>
         <?php endif; ?>
     </div>
-</div>
-</body>
-</html>
+</section>
+
+<?php require __DIR__ . '/../partials/layout_end.php'; ?>

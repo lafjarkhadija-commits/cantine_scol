@@ -1,0 +1,36 @@
+<?php
+$currentPath = $currentPath ?? ($_SERVER['PHP_SELF'] ?? '');
+$navItems = [
+    [
+        'label' => 'Dashboard',
+        'href' => '/cantine_scolaire/eleve/dashboard.php',
+        'icon' => '&#128202;',
+    ],
+    [
+        'label' => 'Commander',
+        'href' => '/cantine_scolaire/eleve/commande_create.php',
+        'icon' => '&#127869;',
+    ],
+    [
+        'label' => 'Deconnexion',
+        'href' => '/cantine_scolaire/logout.php',
+        'icon' => '&#128682;',
+    ],
+];
+?>
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <span>CS</span>
+        Cantine Scolaire
+    </div>
+    <div class="sidebar-section">
+        <div class="sidebar-title">Espace eleve</div>
+        <?php foreach ($navItems as $item): ?>
+            <?php $active = strpos($currentPath, basename($item['href'])) !== false ? 'active' : ''; ?>
+            <a class="sidebar-link <?= $active ?>" href="<?= $item['href'] ?>">
+                <span><?= $item['icon'] ?></span>
+                <span><?= htmlspecialchars($item['label']) ?></span>
+            </a>
+        <?php endforeach; ?>
+    </div>
+</aside>
